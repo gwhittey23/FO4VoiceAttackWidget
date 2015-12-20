@@ -13,6 +13,7 @@ class FO4VaWidget(widgets.WidgetBase):
         self.widget.btnStart.clicked.connect(self._startserver)
         self.setWidget(self.widget)
         self.FO4Connected = False
+        self.serverRun = False
         self._locations_dict = {}
 
     def init(self, app, datamanager):
@@ -29,12 +30,15 @@ class FO4VaWidget(widgets.WidgetBase):
             self.pipWorldLocations = self.pipMapWorldObject.child('Locations')
 
     def _startserver(self):
-        if self.FO4Connected:
-            self.server = socket_server("localhost",8089,  self.rootObject , self.dataManager)
-            self.server.start()
+        if not self.serverRun :
+            if self.FO4Connected:
+                self.server = socket_server("localhost",8089,  self.rootObject , self.dataManager)
+                self.server.start()
+                self.serverRun = True
+            else:
+                print("Not Connected")
         else:
-            print("Not Connected")
-
+            print("server already running")
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):

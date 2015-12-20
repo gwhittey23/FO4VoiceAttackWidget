@@ -61,19 +61,33 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         print("Command =%s" %(sCommand))
         sName = sName_Raw[1]
         print (self.server.pipRootObj)
-        if sCommand == '1':
+        if sCommand == 'FastTravel':
             print('Fastravel')
             self.sSafeMode = False
             return_message =  self.VAFastTravel(sName)
-        elif sCommand == '2':
+        elif sCommand == 'Directions':
             print("Directions")
-            return_message = self.GetDirections(sName)
+            return_message = self.GetDirections(sName, 'LocationDirections')
+        elif sCommand == 'QuestDirections':
+            print("QuestDirections")
+            #return_message = self.GetQuestDirections(sName)
+            return_message = self.GetDirections(sName, 'QuestDirections')
+        elif sCommand == 'MonitorHP':
+            self.MonitorHP()
         if not return_message:
             return_message = 'Error'
         # just send back the same data, but upper-cased
         self.request.sendall(return_message.encode('utf-8'))
         self.request.close()
 
+    def MonitorHP(self):
+        if self.server.pipRootObj:
+            pipPlayerObject = self.server.pipRootObj.child('PlayerInfo')
+            if pipPlayerObject:
+                currHp = pipPlayerObject.child('CurrHP')
+            if currHp:
+                print('Current Health: ', currHp.value())
+                return currHp
     def VAFastTravel(self, sName):
             strFound = False
             if self.server.pipRootObj:
@@ -109,16 +123,21 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                    self.data = "Fast Travel Location " + sName + " unSuccessful"
                 return self.data
 
-    def GetDirections(self, sName):
+
+
+    def GetDirections(self, sName, sType):
         strFound = False
         if self.server.pipRootObj:
                 pipMapObject = self.server.pipRootObj.child('Map')
                 pipMapWorldObject = pipMapObject.child('World')
                 if pipMapWorldObject:
-                    pipWorldLocations = pipMapWorldObject.child('Locations')
                     pipPlayerLocation = pipMapWorldObject.child('Player')
+                    if sType == "LocationDirections":
+                        pipLocations = pipMapWorldObject.child('Locations')
+                    elif sType == "QuestDirections":
+                        pipLocations = pipMapWorldObject.child('Quests')
                     print("Direction to %s" % sName)
-                    for k in pipWorldLocations.value():
+                    for k in pipLocations.value():
                             for x in k.value():
                                 if x == 'Name':
                                     curName = k.child(x).value()
@@ -127,7 +146,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                                         strFound = True
                                         print('curKey ' + str(curKey))
                 if strFound:
-                    ToLocation = pipWorldLocations.child(curKey)
+                    ToLocation = pipLocations.child(curKey)
                     PlayerY = float(pipPlayerLocation.child('Y').value())
                     PlayerX = float(pipPlayerLocation.child('X').value())
                     LocationX =float(ToLocation.child('X').value()) #18232.314453125

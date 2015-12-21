@@ -8,7 +8,7 @@ class FO4VaWidget(widgets.WidgetBase):
     _signalPipWorldLocationsUpdated = QtCore.pyqtSignal()
 
     def __init__(self, mhandle, parent):
-        super().__init__('FO4VA', parent)
+        super().__init__('FO4VAWidget', parent)
         self.widget = uic.loadUi(os.path.join(mhandle.basepath, 'ui', 'fo4va.ui'))
         self.widget.btnStart.clicked.connect(self._startserver)
         self.widget.chkStart.clicked.connect(self.autoConnectToggled)
@@ -50,7 +50,7 @@ class FO4VaWidget(widgets.WidgetBase):
                 try:
                     host = self.widget.txtIP.text()
                     port = int(self.widget.txtPort.text())
-                    print('port = %s' % port)
+
 
                     self.server = socket_server(host, port,  self.rootObject , self.dataManager)
                     self.server.start()
@@ -89,7 +89,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         sName_Raw = str(self.data.decode()).split(';')
         sCommand = sName_Raw[0]
         sName = sName_Raw[1]
-        print (self.server.pipRootObj)
         if sCommand == 'FastTravel':
             self.sSafeMode = False
             return_message =  self.VAFastTravel(sName)
@@ -132,7 +131,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                 if pipMapWorldObject:
                     pipWorldLocations = pipMapWorldObject.child('Locations')
                     if pipWorldLocations:
-                        print(sName)
                         for k in pipWorldLocations.value():
                             for x in k.value():
                                 if x == 'Name':
@@ -140,20 +138,13 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                                     if curName.lower() == sName.lower():
                                         curKey = k.pipParentKey
                                         strFound = True
-                                        print('curKey ' + str(curKey))
                 if strFound:
                     curPoint = pipWorldLocations.child(curKey)
-                    print("curPoint = %s" % curPoint)
                     discovered = pipWorldLocations.child(curKey).child('Discovered').value()
-                    print(curPoint.pipId)
-                    print("discovered =%s" % discovered)
                     if discovered:
-                        print("True")
-
                         self.server.pipDataManager.rpcFastTravel(curPoint)
                         self.data = "Fast Travel Location " + sName + " Successful"
                     else:
-                        print("False")
                         self.data = "Location " + sName + " Has Not Been Discovered yet"
                 else:
                    self.data = "Fast Travel Location " + sName + " unSuccessful"
@@ -180,7 +171,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                         pipLocations = pipMapWorldObject.child('Locations')
                     elif sType == "QuestDirections":
                         pipLocations = pipMapWorldObject.child('Quests')
-                    print("Direction to %s" % sName)
                     for k in pipLocations.value():
                             for x in k.value():
                                 if x == 'Name':
@@ -188,7 +178,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                                     if curName.lower() == sName.lower():
                                         curKey = k.pipParentKey
                                         strFound = True
-                                        print('curKey ' + str(curKey))
                 if strFound:
                     ToLocation = pipLocations.child(curKey)
                     PlayerY = float(pipPlayerLocation.child('Y').value())
@@ -196,15 +185,17 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                     LocationX =float(ToLocation.child('X').value()) #18232.314453125
                     LocationY = float(ToLocation.child('Y').value())#14378.2109375
 
-                    from math import degrees, atan2
+                    from math import degrees, atan2,hypot
 
                     angle = degrees(atan2(LocationY - PlayerY, LocationX - PlayerX))
                     bearing = (90 - angle) % 360
                     dirs = ["North", "North by northEast", "North East", "East by NorthEast", "East", "East by SouthEast", "SouthEast", "South by SsouthEast",
                      "Ssouth", "South by SsouthWest", "SouthWest", "West by SsouthWest", "West", "WestNorthWest", "NorthWest", "North by NorthWest"]
                     ix = int((bearing + 11.25)/22.5)
+                    dist = hypot(LocationX - PlayerX, LocationY - PlayerY)
                     compass_direction = (dirs[ix % 16])
-                    return compass_direction
+                    rtMessage = compass_direction
+                    return rtMessage
 
 
 class MiddelWareServer(socketserver.TCPServer):

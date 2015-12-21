@@ -216,9 +216,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             if (self.pipRadioObject):
                 for i in range(0, self.pipRadioObject.childCount()):
                     station = self.pipRadioObject.child(i)
-
                     if station.child('inRange').value():
-
                         self.availableRadioStations.append(station)
                     if station.child('active').value():
                         self.currentRadioStation = station
@@ -243,15 +241,17 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                             curKey = k.pipParentKey
                             strFound = True
         if strFound:
+
             curStation = self.pipRadioObject.child(curKey)
             inRange = self.pipRadioObject.child(curKey).child('inRange').value()
             if inRange:
                 self.server.pipdataManager.rpcToggleRadioStation(curStation)
-                self.data = "Tune to " + self.newstation + " Successful"
+                data = "Tune to " + self.newstation + " Successful"
             else:
-                self.data = "Staion " + self.newstation + " is not in range"
+                data = "Staion " + self.newstation + " is not in range"
         else:
-            self.data = "Tune to " + self.newstation + " unSuccessful"
+            data = "Tune to " + self.newstation + " unSuccessful"
+        return data
     def ToggleRadio(self):
         if (self.currentRadioStation):
                 self.data = ('toggleRadio: currentstation: ' + self.currentRadioStation.child('text').value())

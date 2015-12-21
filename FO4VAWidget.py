@@ -1,6 +1,5 @@
 import os
 from PyQt5 import  QtCore, uic, QtWidgets
-from PyQt5.QtWidgets import QMessageBox
 import socketserver
 from .. import widgets
 from widgets.shared import settings
@@ -83,10 +82,13 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         return_message = ""
+
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024).strip()
         self.SafeMode = True
+
         sName_Raw = str(self.data.decode()).split(';')
+        print(self.data)
         sCommand = sName_Raw[0]
         sName = sName_Raw[1]
         if sCommand == 'FastTravel':
@@ -98,6 +100,12 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             return_message = self.GetDirections(sName, 'QuestDirections')
         elif sCommand == 'MonitorHP':
             self.MonitorHP()
+        elif sCommand == "RadioToggle":
+            return_message = self.RadioControl(sName, 'ToggleRadio')
+        elif sCommand == "ChangeStation":
+            return_message = self.RadioControl(sName, 'ChangeStation')
+        elif sCommand == "NextStation":
+            return_message = self.RadioControl(sName, 'NextStation')
         if not return_message:
             return_message = 'Error'
         self.request.sendall(return_message.encode('utf-8'))
@@ -142,13 +150,13 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                     curPoint = pipWorldLocations.child(curKey)
                     discovered = pipWorldLocations.child(curKey).child('Discovered').value()
                     if discovered:
-                        self.server.pipDataManager.rpcFastTravel(curPoint)
-                        self.data = "Fast Travel Location " + sName + " Successful"
+                        self.server.pipdataManager.rpcFastTravel(curPoint)
+                        data = "Fast Travel Location " + sName + " Successful"
                     else:
-                        self.data = "Location " + sName + " Has Not Been Discovered yet"
+                        data = "Location " + sName + " Has Not Been Discovered yet"
                 else:
-                   self.data = "Fast Travel Location " + sName + " unSuccessful"
-                return self.data
+                   data = "Fast Travel Location " + sName + " unSuccessful"
+                return data
 
 
 
@@ -197,16 +205,93 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                     rtMessage = compass_direction
                     return rtMessage
 
+    def RadioControl(self, newstation, stype):
+        """used some code from hotkeys widget
+        """
+        self.currentRadioStation = None
+        self.availableRadioStations = []
+        self.newstation = newstation
+        if self.server.pipRootObj:
+            self.pipRadioObject =  self.server.pipRootObj.child('Radio')
+            if (self.pipRadioObject):
+                for i in range(0, self.pipRadioObject.childCount()):
+                    station = self.pipRadioObject.child(i)
+
+                    if station.child('inRange').value():
+
+                        self.availableRadioStations.append(station)
+                    if station.child('active').value():
+                        self.currentRadioStation = station
+
+                if stype == 'ToggleRadio':
+                   data =  self.data = self.ToggleRadio()
+                elif stype == 'ChangeStation':
+                    data = self.ChangeStation()
+                elif stype == 'NextStation':
+                    data = self.NextStation()
+
+        return data
+
+    def ChangeStation(self):
+        strFound = False
+        if self.pipRadioObject:
+            for k in self.pipRadioObject.value():
+                for x in k.value():
+                    if x == 'text':
+                        curName = k.child(x).value()
+                        if curName.lower() == self.newstation.lower():
+                            curKey = k.pipParentKey
+                            strFound = True
+        if strFound:
+            curStation = self.pipRadioObject.child(curKey)
+            inRange = self.pipRadioObject.child(curKey).child('inRange').value()
+            if inRange:
+                self.server.pipdataManager.rpcToggleRadioStation(curStation)
+                self.data = "Tune to " + self.newstation + " Successful"
+            else:
+                self.data = "Staion " + self.newstation + " is not in range"
+        else:
+            self.data = "Tune to " + self.newstation + " unSuccessful"
+    def ToggleRadio(self):
+        if (self.currentRadioStation):
+                self.data = ('toggleRadio: currentstation: ' + self.currentRadioStation.child('text').value())
+                self.server.pipdataManager.rpcToggleRadioStation(self.currentRadioStation)
+        else:
+            self.data = ('toggleRadio: no current, trying station First aviable station')
+            numStations = len(self.availableRadioStations)
+            if numStations > 0:
+                self.server.pipdataManager.rpcToggleRadioStation(self.availableRadioStations[0])
+
+    def NextStation(self):
+        getIndex = 0
+        numStations = len(self.availableRadioStations)
+        if self.currentRadioStation:
+            txtResponse =('nextRadio: currentstation: ' + self.currentRadioStation.child('text').value())
+            for i in range (0, numStations):
+                if self.availableRadioStations[i].child('text').value() == self.currentRadioStation.child('text').value():
+                    getIndex = i + 1
+                    break
+
+        if (getIndex >= numStations):
+            getIndex = 0
+
+        if (getIndex <= numStations):
+            txtResponse =('tuning radio to: ' + self.availableRadioStations[getIndex].child('text').value())
+            self.server.pipdataManager.rpcToggleRadioStation(self.availableRadioStations[getIndex])
+
+        return txtResponse
+
+
+
 
 class MiddelWareServer(socketserver.TCPServer):
-
     # This class just here to store values to be passed along to handler
     def __init__(self, server_address, RequestHandlerClass, pipObj, pipDataManager):
         socketserver.ThreadingTCPServer.__init__(self,
                                                  server_address,
                                                  RequestHandlerClass)
         self.pipRootObj = pipObj
-        self.pipDataManager = pipDataManager
+        self.pipdataManager = pipDataManager
 
 
 

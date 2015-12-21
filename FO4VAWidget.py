@@ -1,9 +1,9 @@
 import os
-from PyQt5 import  QtCore, uic
+from PyQt5 import  QtCore, uic, QtWidgets
+from PyQt5.QtWidgets import QMessageBox
 import socketserver
 from .. import widgets
-
-
+from widgets.shared import settings
 class FO4VaWidget(widgets.WidgetBase):
     _signalPipWorldLocationsUpdated = QtCore.pyqtSignal()
 
@@ -11,6 +11,8 @@ class FO4VaWidget(widgets.WidgetBase):
         super().__init__('FO4VA', parent)
         self.widget = uic.loadUi(os.path.join(mhandle.basepath, 'ui', 'fo4va.ui'))
         self.widget.btnStart.clicked.connect(self._startserver)
+        self.widget.chkStart.clicked.connect(self.autoConnectToggled)
+        self.settings = settings
         self.setWidget(self.widget)
         self.FO4Connected = False
         self.serverRun = False
@@ -20,25 +22,52 @@ class FO4VaWidget(widgets.WidgetBase):
         super().init(app, datamanager)
         self.dataManager = datamanager
         self.dataManager.registerRootObjectListener(self._onPipRootObjectEvent)
+        self._app = app
+        if self._app.settings.value('FO4VaWidget/lasthost'):
+            host = self._app.settings.value('FO4VaWidget/lasthost')
+        if self._app.settings.value('FO4VaWidget/lastport'):
+            port = self._app.settings.value('FO4VaWidget/lastport')
+        if int(self._app.settings.value('FO4VaWidget/autoconnect', 0)):
+            self.widget.chkStart.setChecked(True)
+            self.autoStart = True
+        self.widget.txtIP.setText(host)
+        self.widget.txtPort.setText(str(port))
+
+    @QtCore.pyqtSlot(bool)
+    def autoConnectToggled(self, value):
+       self._app.settings.setValue('FO4VaWidget/autoconnect', int(value))
 
     def _onPipRootObjectEvent(self, rootObject):
         self.rootObject = rootObject
-        self.pipMapObject = rootObject.child('Map')
-        self.pipMapWorldObject = self.pipMapObject.child('World')
         self.FO4Connected = True
-        if self.pipMapWorldObject:
-            self.pipWorldLocations = self.pipMapWorldObject.child('Locations')
+        if self.autoStart:
+            self._startserver()
+
 
     def _startserver(self):
         if not self.serverRun :
             if self.FO4Connected:
-                self.server = socket_server("localhost",8089,  self.rootObject , self.dataManager)
-                self.server.start()
-                self.serverRun = True
+                try:
+                    host = self.widget.txtIP.text()
+                    port = int(self.widget.txtPort.text())
+                    print('port = %s' % port)
+
+                    self.server = socket_server(host, port,  self.rootObject , self.dataManager)
+                    self.server.start()
+                    self.serverRun = True
+
+                except ValueError as e:
+                    QtWidgets.QMessageBox.warning(self, 'Connection to host failed',
+                            'Caught exception while parsing port: ' + str(e),
+                            QtWidgets.QMessageBox.Ok)
+                self._app.settings.setValue('FO4VaWidget/lastport',str(port))
+                self._app.settings.setValue('FO4VaWidget/lasthost',str(host))
             else:
-                print("Not Connected")
+                QtWidgets.QMessageBox.about(self, 'Error!',
+                                            "Must Connect to Fallout 4 first")
         else:
-            print("server already running")
+            QtWidgets.QMessageBox.about(self, 'Error!',
+                                            "Server is Already Running")
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -57,34 +86,27 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024).strip()
         self.SafeMode = True
-        print("{} wrote:".format(self.client_address[0]))
-        print(self.data)
         sName_Raw = str(self.data.decode()).split(';')
         sCommand = sName_Raw[0]
-
-        print("Command =%s" %(sCommand))
         sName = sName_Raw[1]
         print (self.server.pipRootObj)
         if sCommand == 'FastTravel':
-            print('Fastravel')
             self.sSafeMode = False
             return_message =  self.VAFastTravel(sName)
         elif sCommand == 'Directions':
-            print("Directions")
             return_message = self.GetDirections(sName, 'LocationDirections')
         elif sCommand == 'QuestDirections':
-            print("QuestDirections")
-            #return_message = self.GetQuestDirections(sName)
             return_message = self.GetDirections(sName, 'QuestDirections')
         elif sCommand == 'MonitorHP':
             self.MonitorHP()
         if not return_message:
             return_message = 'Error'
-        # just send back the same data, but upper-cased
         self.request.sendall(return_message.encode('utf-8'))
         self.request.close()
 
     def MonitorHP(self):
+        """Just a WIP
+        """
         if self.server.pipRootObj:
             pipPlayerObject = self.server.pipRootObj.child('PlayerInfo')
             if pipPlayerObject:
@@ -92,7 +114,17 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             if currHp:
                 print('Current Health: ', currHp.value())
                 return currHp
+
     def VAFastTravel(self, sName):
+            """
+                 Takes the sent map location name(sName) and issues fast travel rpc command to go there
+                And returns a stauts message to VA
+            Args:
+                sName:
+
+            Returns:
+
+            """
             strFound = False
             if self.server.pipRootObj:
                 pipMapObject = self.server.pipRootObj.child('Map')
@@ -130,6 +162,14 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
 
     def GetDirections(self, sName, sType):
+        """
+        Args:
+            sName: Name of location or quest sent from VA
+            sType: either LocationDirections or QuestDirections to determine type of location lookup
+
+        Returns:
+            compass_direction in a english response
+        """
         strFound = False
         if self.server.pipRootObj:
                 pipMapObject = self.server.pipRootObj.child('Map')
@@ -155,18 +195,14 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                     PlayerX = float(pipPlayerLocation.child('X').value())
                     LocationX =float(ToLocation.child('X').value()) #18232.314453125
                     LocationY = float(ToLocation.child('Y').value())#14378.2109375
-                    print("pipPlayerLocation is % s" % pipPlayerLocation.child('Y').value())
 
                     from math import degrees, atan2
 
                     angle = degrees(atan2(LocationY - PlayerY, LocationX - PlayerX))
-                    bearing1 = (angle + 360) % 360
-                    bearing2 = (90 - angle) % 360
-                    print ("gb: x=%2d y=%2d angle=%6.1f bearing1=%5.1f bearing2=%5.1f" % (
-                        PlayerX, PlayerY, angle, bearing1, bearing2))
+                    bearing = (90 - angle) % 360
                     dirs = ["North", "North by northEast", "North East", "East by NorthEast", "East", "East by SouthEast", "SouthEast", "South by SsouthEast",
                      "Ssouth", "South by SsouthWest", "SouthWest", "West by SsouthWest", "West", "WestNorthWest", "NorthWest", "North by NorthWest"]
-                    ix = int((bearing2 + 11.25)/22.5)
+                    ix = int((bearing + 11.25)/22.5)
                     compass_direction = (dirs[ix % 16])
                     return compass_direction
 

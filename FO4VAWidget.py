@@ -27,12 +27,11 @@ class FO4VaWidget(widgets.WidgetBase):
         self._app = app
         host = "127.0.0.1"
         port = 8089
-
-        if self._app.settings.value('FO4VaWidget/lasthost'):
-            host = self._app.settings.value('FO4VaWidget/lasthost')
-        if self._app.settings.value('FO4VaWidget/lastport'):
-            port = self._app.settings.value('FO4VaWidget/lastport')
-        if int(self._app.settings.value('FO4VaWidget/autoconnect', 0)):
+        if self._app.settings.value('FO4VaWidget2/lasthost'):
+            host = self._app.settings.value('FO4VaWidget2/lasthost')
+        if self._app.settings.value('FO4VaWidget2/lastport'):
+            port = self._app.settings.value('FO4VaWidget2/lastport')
+        if int(self._app.settings.value('FO4VaWidget2/autoconnect', 0)):
             self.widget.chkStart.setChecked(True)
             self.autoStart = True
         self.widget.txtIP.setText(host)
@@ -42,11 +41,10 @@ class FO4VaWidget(widgets.WidgetBase):
         self.serverThread = False
     @QtCore.pyqtSlot(bool)
     def autoConnectToggled(self, value):
-       self._app.settings.setValue('FO4VaWidget/autoconnect', int(value))
+       self._app.settings.setValue('FO4VaWidget2/autoconnect', int(value))
 
     def _onPipRootObjectEvent(self, rootObject):
         self.rootObject = rootObject
-
         if self.autoStart:
             self._startserver()
 
@@ -69,12 +67,13 @@ class FO4VaWidget(widgets.WidgetBase):
                     port = int(self.widget.txtPort.text())
                     self.serverThread = socket_serverThread(host, port,  self.rootObject , self.dataManager)
                     self.serverThread.start()
+                    self.widget.lblServerState.setText("Server is On")
                 except ValueError as e:
                     QtWidgets.QMessageBox.warning(self, 'Connection to host failed',
                             'Caught exception while parsing port: ' + str(e),
                             QtWidgets.QMessageBox.Ok)
-                self._app.settings.setValue('FO4VaWidget/lastport',str(port))
-                self._app.settings.setValue('FO4VaWidget/lasthost',str(host))
+                self._app.settings.setValue('FO4VaWidget2/lastport',str(port))
+                self._app.settings.setValue('FO4VaWidget2/lasthost',str(host))
             else:
                 QtWidgets.QMessageBox.about(self, 'Error!',
                                             "Must Connect to Fallout 4 first")
@@ -83,8 +82,9 @@ class FO4VaWidget(widgets.WidgetBase):
                                             "Server is Already Running")
 
     def _stopserver(self):
-        self.serverThread.shutdown()
+        self.serverThread._shutdown()
         self.serverThread.terminate()
+        self.widget.lblServerState.setText("Server is Off")
         self.serverThread = False
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -324,7 +324,7 @@ class socket_serverThread(QtCore.QThread):
     def __del__(self):
         self.wait()
 
-    def shutdown(self):
+    def _shutdown(self):
         self.tcpServer.shutdown()
         self.tcpServer.server_close()
         self.tcpServer = ""

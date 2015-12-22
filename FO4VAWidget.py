@@ -17,7 +17,7 @@ class FO4VaWidget(widgets.WidgetBase):
         self.settings = settings
         self.setWidget(self.widget)
         self.FO4Connected = False
-
+        self.autoStart = False
 
 
     def init(self, app, datamanager):
@@ -25,6 +25,9 @@ class FO4VaWidget(widgets.WidgetBase):
         self.dataManager = datamanager
         self.dataManager.registerRootObjectListener(self._onPipRootObjectEvent)
         self._app = app
+        host = "127.0.0.1"
+        port = 8089
+
         if self._app.settings.value('FO4VaWidget/lasthost'):
             host = self._app.settings.value('FO4VaWidget/lasthost')
         if self._app.settings.value('FO4VaWidget/lastport'):

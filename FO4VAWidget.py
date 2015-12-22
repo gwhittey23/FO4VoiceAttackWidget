@@ -3,19 +3,22 @@ from PyQt5 import  QtCore, uic, QtWidgets
 import socketserver
 from .. import widgets
 from widgets.shared import settings
+from pypipboy.network import NetworkChannel
+
 class FO4VaWidget(widgets.WidgetBase):
-    _signalPipWorldLocationsUpdated = QtCore.pyqtSignal()
+
 
     def __init__(self, mhandle, parent):
         super().__init__('FO4VAWidget', parent)
         self.widget = uic.loadUi(os.path.join(mhandle.basepath, 'ui', 'fo4va.ui'))
         self.widget.btnStart.clicked.connect(self._startserver)
+        self.widget.btnStop.clicked.connect(self._stopserver)
         self.widget.chkStart.clicked.connect(self.autoConnectToggled)
         self.settings = settings
         self.setWidget(self.widget)
         self.FO4Connected = False
-        self.serverRun = False
-        self._locations_dict = {}
+
+
 
     def init(self, app, datamanager):
         super().init(app, datamanager)
@@ -31,30 +34,38 @@ class FO4VaWidget(widgets.WidgetBase):
             self.autoStart = True
         self.widget.txtIP.setText(host)
         self.widget.txtPort.setText(str(port))
-
+        self.networkchannel = datamanager.networkchannel
+        self.networkchannel.registerConnectionListener(self._onConnectionStateChange)
+        self.serverThread = False
     @QtCore.pyqtSlot(bool)
     def autoConnectToggled(self, value):
        self._app.settings.setValue('FO4VaWidget/autoconnect', int(value))
 
     def _onPipRootObjectEvent(self, rootObject):
         self.rootObject = rootObject
-        self.FO4Connected = True
+
         if self.autoStart:
             self._startserver()
 
+    def _onConnectionStateChange(self, state, errstatus, errmsg):
+        if state:
+            self.FO4Connected = True
+        else:
+            if errstatus != 0:
+                self._stopserver()
+                self.FO4Connected = False
+            else:
+                self.FO4Connected = False
+                self._stopserver()
 
     def _startserver(self):
-        if not self.serverRun :
+        if not self.serverThread:
             if self.FO4Connected:
                 try:
                     host = self.widget.txtIP.text()
                     port = int(self.widget.txtPort.text())
-
-
-                    self.server = socket_server(host, port,  self.rootObject , self.dataManager)
-                    self.server.start()
-                    self.serverRun = True
-
+                    self.serverThread = socket_serverThread(host, port,  self.rootObject , self.dataManager)
+                    self.serverThread.start()
                 except ValueError as e:
                     QtWidgets.QMessageBox.warning(self, 'Connection to host failed',
                             'Caught exception while parsing port: ' + str(e),
@@ -68,6 +79,10 @@ class FO4VaWidget(widgets.WidgetBase):
             QtWidgets.QMessageBox.about(self, 'Error!',
                                             "Server is Already Running")
 
+    def _stopserver(self):
+        self.serverThread.shutdown()
+        self.serverThread.terminate()
+        self.serverThread = False
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
 
@@ -295,7 +310,7 @@ class MiddelWareServer(socketserver.TCPServer):
 
 
 
-class socket_server(QtCore.QThread):
+class socket_serverThread(QtCore.QThread):
     def __init__(self, host, port, pipObj, pipDataManager):
         QtCore.QThread.__init__(self)
         self.HOST = host
@@ -306,8 +321,16 @@ class socket_server(QtCore.QThread):
     def __del__(self):
         self.wait()
 
+    def shutdown(self):
+        self.tcpServer.shutdown()
+        self.tcpServer.server_close()
+        self.tcpServer = ""
+
+
     def run(self):
-        server = MiddelWareServer((self.HOST, self.PORT), MyTCPHandler, self.pipObj, self.pipDataManager)
-        server.serve_forever()
+        self.tcpServer = MiddelWareServer((self.HOST, self.PORT), MyTCPHandler, self.pipObj, self.pipDataManager)
+        self.tcpServer.serve_forever()
+        print("ok")
+        self.tcpServer.shutdown()
 
 

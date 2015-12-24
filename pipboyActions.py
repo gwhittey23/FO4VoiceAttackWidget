@@ -91,8 +91,10 @@ class InvetoryControl():
         self.pipdataManager = pipdataManager
         self.availableGrenades = []
         self.lastEquippedGrenade = ""
+
+
         if self.pipRootObj:
-            self.pipInventoryInfo = self.pipInventoryInfo = self.pipRootObj.child('Inventory')
+            self.pipInventoryInfo = self.pipRootObj.child('Inventory')
             if (self.pipInventoryInfo):
                 weapons = self.pipInventoryInfo.child('43')
                 if(not weapons):
@@ -147,13 +149,31 @@ class InvetoryControl():
             inventory = self.pipInventoryInfo.child(inventorySection)
             for i in range(0, inventory.childCount()):
                 name = inventory.child(i).child('text').value()
-
                 if name.lower() == itemName:
-                    self.pipdataManager.rpcUseItem(inventory.child(i))
-                    data = 'Item %s has been equipped' % itemName
-                    return data
+                    print(inventory.child(i))
+                    if self.realWeaponCheck(inventory.child(i).pipId):
+                        self.pipdataManager.rpcUseItem(inventory.child(i))
+                        data = itemName
+                        return data
+
             data = 'Could not find %s in your inventory' %  itemName
         return data
+
+    def realWeaponCheck(self, pipId):
+        """
+        Will check if weapon is real one by seeing if it's pipID is in sortID list.
+        Args: pipID: ID of weapon to check
+
+        Returns:True/False
+        """
+        if self.pipInventoryInfo:
+            self.sortedIDS = []
+            sortedIDInfo = self.pipInventoryInfo.child('sortedIDS')
+            for k in sortedIDInfo.value():
+               self.sortedIDS.append(k.value())
+            if pipId in self.sortedIDS:
+                return True
+
 
 class MapControl():
     """

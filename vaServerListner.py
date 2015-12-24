@@ -44,15 +44,18 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         elif sCommand == "NextStation":
             self.radioControl = RadioControl(self.server.pipdataManager , self.server.pipRootObj)
             return_message = self.radioControl.nextStation()
-        # elif sCommand == "EquipWeapon":
-        #     return_message = self.useItemByName('43', sName)
+        elif sCommand == "EquipWeapon":
+            self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
+            return_message = self.invControl.useInventoryItemByName(sName,'43')
         elif sCommand == "NextGrenade":
             self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
             return_message = self.invControl.equipNextGrendae()
         elif sCommand == 'GrenadeEquip':
              self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
              return_message = self.invControl.useInventoryItemByName(sName,'43')
-
+        elif sCommand == 'EatFood':
+             self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
+             return_message = self.invControl.useInventoryItemByName(sName,'48')
         else:
             return_message = "Could not process SentCommand %s" % sCommand
         if not return_message:

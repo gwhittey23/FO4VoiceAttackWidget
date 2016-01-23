@@ -59,7 +59,8 @@ class FO4VaWidget(widgets.WidgetBase):
         self._signalInfoUpdated.emit()
 
         if self.autoStart:
-            self._startserver()
+            pass
+            #self._startserver()
         pass
 
     def _onPipPlayerInfoUpdate(self, caller, value, pathObjs):
@@ -67,7 +68,8 @@ class FO4VaWidget(widgets.WidgetBase):
 
     @QtCore.pyqtSlot()
     def _slotInfoUpdated(self):
-        self.serverThread._onUpdate(self.rootObject)
+       if self.serverThread:
+           self.serverThread._onUpdate(self.rootObject)
 
 
 

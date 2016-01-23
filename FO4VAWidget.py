@@ -1,8 +1,8 @@
 import os
 from PyQt5 import  QtCore, uic, QtWidgets
-from PyPipboyApp.widgets import widgets
+from widgets import widgets
 from .vaServerListner import socket_serverThread
-from PyPipboyApp.widgets.shared import settings
+from widgets.shared import settings
 import logging
 
 class FO4VaWidget(widgets.WidgetBase):

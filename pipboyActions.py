@@ -1,4 +1,5 @@
-
+import re
+from pypipboy import inventoryutils
 
 class RadioControl():
 
@@ -91,7 +92,13 @@ class InvetoryControl():
         self.pipdataManager = pipdataManager
         self.availableGrenades = []
         self.lastEquippedGrenade = ""
-
+        self.availableMines = []
+        self.lastEquippedMine = ""
+        self.availableExplosives = []
+        self.availableGuns = []
+        self.lastEquippedGun = ""
+        self.availableFavGuns = []
+        self.lastEquippedFavGun = ""
 
         if self.pipRootObj:
             self.pipInventoryInfo = self.pipRootObj.child('Inventory')
@@ -99,17 +106,109 @@ class InvetoryControl():
                 weapons = self.pipInventoryInfo.child('43')
                 if(not weapons):
                     return
-                for i in range(0, weapons.childCount()):
+                for item in weapons.value():
                     equipped = False
-                    name = weapons.child(i).child('text').value()
-                    if (name.lower().find('mine') > -1 or
-                        name.lower().find('grenade') > -1 or
-                            name.lower().find('molotov') > -1):
-                        count = str(weapons.child(i).child('count').value())
-                        if (weapons.child(i).child('equipState').value() == 3):
+                    favorite = False
+                    name = item.child('text').value()
+                    if inventoryutils.itemIsWeaponGun(item) and self.realWeaponCheck(item.pipId):
+                        if (item.child('equipState').value() >0):
                             equipped = True
-                            self.lastEquippedGrenade = name.lower()
-                        self.availableGrenades.append([name.lower(), equipped])
+                            self.lastEquippedGun = name.lower()
+                            if (item.child('favorite').value() >0 ): self.lastEquippedFavGun = name.lower()
+
+
+                        if (item.child('favorite').value() >0 ): self.availableFavGuns.append([name.lower(), equipped])
+                        self.availableGuns.append([name.lower(), equipped])
+                    elif inventoryutils.itemIsWeaponMelee(item):
+                        pass
+                    elif inventoryutils.itemIsWeaponThrowable(item):
+                        if (item.child('equipState').value() == 3):
+                                equipped = True
+                                self.lastEquippedExplosive = name.lower()
+                        if (name.lower().find('grenade') > -1 or
+                            name.lower().find('molotov') > -1):
+                            if (item.child('equipState').value() == 3):
+                                equipped = True
+                                self.lastEquippedGrenade = name.lower()
+                            self.availableGrenades.append([name.lower(), equipped])
+                        if (name.lower().find('mine') > -1):
+                            if (item.child('equipState').value() == 3):
+                                equipped = True
+                                self.lastEquippedMine = name.lower()
+                            self.availableMines.append([name.lower(), equipped])
+                self.availableExplosives = self.availableGrenades + self.availableMines
+
+    def equipNextGun(self):
+        """Modified Code from hotkey.py  credit goes to  akamal """
+        data = ""
+        nextIndex = -1
+        lastIndex = -1
+        self.availableGuns.sort()
+        print(self.availableGuns)
+        numGuns = len(self.availableGuns)
+        if (numGuns > 0):
+            for i in range(0, numGuns):
+                if (self.availableGuns[i][1]):
+                    nextIndex = i + 1
+                    break
+                if (self.availableGuns[i][0] == self.lastEquippedGun):
+                    lastIndex = i
+            if (nextIndex == numGuns):
+                nextIndex = 0
+
+            if (nextIndex < 0 and lastIndex >= 0):
+                nextIndex = lastIndex
+
+            if(nextIndex < 0):
+                nextIndex = 0
+
+            re1='(\\[).*?(\\])'
+            re2='(\\().*?(\\))'
+            re3='(\\{).*?(\\})'
+            gunName = re.sub(re1,'',self.availableGuns[nextIndex][0])
+            gunName = re.sub(re2,"",gunName)
+            gunName = re.sub(re3,"",gunName).lstrip()
+            self.useInventoryItemByName(gunName,"43")
+            data = self.availableGuns[nextIndex][0]
+        else:
+            data = 'You have no Guns in your inventory'
+        return data
+
+    def equipNextFavGun(self):
+        """Modified Code from hotkey.py  credit goes to  akamal """
+        data = ""
+        nextIndex = -1
+        lastIndex = -1
+        self.availableFavGuns.sort()
+        print(self.availableFavGuns)
+        numFavGuns = len(self.availableFavGuns)
+        if (numFavGuns > 0):
+            for i in range(0, numFavGuns):
+                if (self.availableFavGuns[i][1]):
+                    nextIndex = i + 1
+                    break
+                if (self.availableFavGuns[i][0] == self.lastEquippedFavGun):
+                    lastIndex = i
+            if (nextIndex == numFavGuns):
+                nextIndex = 0
+
+            if (nextIndex < 0 and lastIndex >= 0):
+                nextIndex = lastIndex
+
+            if(nextIndex < 0):
+                nextIndex = 0
+
+            re1='(\\[).*?(\\])'
+            re2='(\\().*?(\\))'
+            re3='(\\{).*?(\\})'
+            gunName = re.sub(re1,'',self.availableFavGuns[nextIndex][0])
+            gunName = re.sub(re2,"",gunName)
+            gunName = re.sub(re3,"",gunName).lstrip()
+            self.useInventoryItemByName(gunName,"43")
+            data = self.availableFavGuns[nextIndex][0]
+        else:
+            data = 'You have no FavGuns in your inventory'
+        return data
 
     def equipNextGrendae(self):
         """Modified Code from hotkey.py  credit goes to  akamal """
@@ -134,23 +233,104 @@ class InvetoryControl():
             if(nextIndex < 0):
                 nextIndex = 0
 
-            self.useInventoryItemByName(self.availableGrenades[nextIndex][0],"43")
+            re1='(\\[).*?(\\])'
+            re2='(\\().*?(\\))'
+            re3='(\\{).*?(\\})'
+            nadeName = re.sub(re1,'',self.availableGrenades[nextIndex][0])
+            nadeName = re.sub(re2,"",nadeName)
+            nadeName = re.sub(re3,"",nadeName).lstrip()
+            self.useInventoryItemByName(nadeName,"43")
             data = self.availableGrenades[nextIndex][0]
+        else:
+            data = 'You have no grenades in your inventory'
+        return data
+
+    def equipNextMine(self):
+        """Modified Code from hotkey.py  credit goes to  akamal """
+        data = ""
+        nextIndex = -1
+        lastIndex = -1
+        self.availableMines.sort()
+        numMinees = len(self.availableMines)
+        if (numMinees > 0):
+            for i in range(0, numMinees):
+                if (self.availableMines[i][1]):
+                    nextIndex = i + 1
+                    break
+                if (self.availableMines[i][0] == self.lastEquippedMine):
+                    lastIndex = i
+            if (nextIndex == numMinees):
+                nextIndex = 0
+
+            if (nextIndex < 0 and lastIndex >= 0):
+                nextIndex = lastIndex
+
+            if(nextIndex < 0):
+                nextIndex = 0
+
+            re1='(\\[).*?(\\])'
+            re2='(\\().*?(\\))'
+            re3='(\\{).*?(\\})'
+            mineName = re.sub(re1,'',self.availableMines[nextIndex][0])
+            mineName = re.sub(re2,"",mineName)
+            mineName = re.sub(re3,"",mineName).lstrip()
+            self.useInventoryItemByName(mineName,"43")
+            data = self.availableMines[nextIndex][0]
+        else:
+            data = 'You have no Mines in your inventory'
+        return data
+
+    def equipNextExplosive(self):
+        """Modified Code from hotkey.py  credit goes to  akamal """
+        data = ""
+        nextIndex = -1
+        lastIndex = -1
+        self.availableExplosives.sort()
+        numExplosives = len(self.availableExplosives)
+        if (numExplosives > 0):
+            for i in range(0, numExplosives):
+                if (self.availableExplosives[i][1]):
+                    nextIndex = i + 1
+                    break
+                if (self.availableExplosives[i][0] == self.lastEquippedExplosive):
+                    lastIndex = i
+            if (nextIndex == numExplosives):
+                nextIndex = 0
+
+            if (nextIndex < 0 and lastIndex >= 0):
+                nextIndex = lastIndex
+
+            if(nextIndex < 0):
+                nextIndex = 0
+
+            re1='(\\[).*?(\\])'
+            re2='(\\().*?(\\))'
+            re3='(\\{).*?(\\})'
+            nadeName = re.sub(re1,'',self.availableExplosives[nextIndex][0])
+            nadeName = re.sub(re2,"",nadeName)
+            nadeName = re.sub(re3,"",nadeName).lstrip()
+            self.useInventoryItemByName(nadeName,"43")
+            data = self.availableExplosives[nextIndex][0]
         else:
             data = 'You have no grenades in your inventory'
         return data
 
     def useInventoryItemByName(self, itemName, inventorySection):
         """Modified Code from hotkey.py  credit goes to  akamal """
-        data = ""
 
+        re1='(\\[).*?(\\])'
+        re2='(\\().*?(\\))'
+        re3='(\\{).*?(\\})'
+        data = ""
         itemName = itemName.lower()
         if self.pipInventoryInfo:
             inventory = self.pipInventoryInfo.child(inventorySection)
             for i in range(0, inventory.childCount()):
-                name = inventory.child(i).child('text').value()
-                if name.lower() == itemName:
-                    print(inventory.child(i))
+                name = re.sub(re1,'',inventory.child(i).child('text').value())
+                name = re.sub(re2,"",name)
+                name = re.sub(re3,"",name)
+
+                if name.lower().lstrip() == itemName:
                     if self.realWeaponCheck(inventory.child(i).pipId):
                         self.pipdataManager.rpcUseItem(inventory.child(i))
                         data = itemName
@@ -270,3 +450,52 @@ class MapControl():
                     compass_direction = (dirs[ix % 16])
                     data = compass_direction
                     return data
+
+
+    def placeCustomMarker(self, sName, sOverRide):
+        curKey = False
+        data = ""
+        if self.pipRootObj:
+                strFound = False
+                curKey = ""
+                pipMapObject = self.pipRootObj.child('Map')
+                pipMapWorldObject = pipMapObject.child('World')
+                if pipMapWorldObject:
+                    pipLocations = pipMapWorldObject.child('Locations')
+
+                    for k in pipLocations.value():
+                            for x in k.value():
+                                if x == 'Name':
+                                    curName = k.child(x).value()
+                                    if curName.lower() == sName.lower():
+                                        curKey = k.pipParentKey
+                                        strFound = True
+                if strFound:
+                    print("o2")
+                    ToLocation = pipLocations.child(curKey)
+                    LocationX = float(ToLocation.child('X').value())
+                    LocationY = float(ToLocation.child('Y').value())
+
+                    discovered = ToLocation.child('Discovered').value()
+                    if discovered or sOverRide:
+                        print("ok")
+                        self.pipdataManager.rpcSetCustomMarker(LocationX, LocationY)
+                        data = "Marker placed at %s,%s"% (str(LocationX),str(LocationY))
+                    else:
+                        data = "Location Not Discovered"
+                else:
+                    data = 'Location Not Found'
+        return data
+
+    def removeMarker(self):
+        """
+
+        Args:
+
+
+        Returns:
+
+        """
+        self.pipdataManager.rpcRemoveCustomMarker()
+        data = "Marker Deleted"
+        return data

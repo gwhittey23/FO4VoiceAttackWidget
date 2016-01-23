@@ -1,11 +1,10 @@
 import socketserver
-from PyQt5 import  QtCore
+from PyQt5 import QtCore
 from .pipboyActions import RadioControl, InvetoryControl, MapControl
 import logging
 
+
 class MyTCPHandler(socketserver.BaseRequestHandler):
-
-
     """
     The RequestHandler class for our server.
 
@@ -28,34 +27,60 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
         if sCommand == 'FastTravel':
             self.SafeMode = False
-            self.mapControl = MapControl(self.server.pipdataManager , self.server.pipRootObj)
+            self.mapControl = MapControl(self.server.pipdataManager, self.server.pipRootObj)
             return_message = self.mapControl.onFastTravel(sName)
         elif sCommand == 'Directions':
-            self.mapControl = MapControl(self.server.pipdataManager , self.server.pipRootObj)
+            self.mapControl = MapControl(self.server.pipdataManager, self.server.pipRootObj)
             return_message = self.mapControl.getDirections(sName)
+        elif sCommand == 'PlaceCustomMarker':
+            self.mapControl = MapControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.mapControl.placeCustomMarker(sName,False)
+        elif sCommand == 'PlaceCustomMarkerOverride':
+            self.mapControl = MapControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.mapControl.placeCustomMarker(sName,True)
+        elif sCommand == 'RemoveMarker':
+            self.mapControl = MapControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.mapControl.removeMarker()
         elif sCommand == 'MonitorHP':
             self.monitorHP()
         elif sCommand == "RadioToggle":
-            self.radioControl = RadioControl(self.server.pipdataManager , self.server.pipRootObj)
+            self.radioControl = RadioControl(self.server.pipdataManager, self.server.pipRootObj)
             return_message = self.radioControl.toggleRadio()
         elif sCommand == "ChangeStation":
-            self.radioControl = RadioControl(self.server.pipdataManager , self.server.pipRootObj)
+            self.radioControl = RadioControl(self.server.pipdataManager, self.server.pipRootObj)
             return_message = self.radioControl.changeStation(sName)
         elif sCommand == "NextStation":
-            self.radioControl = RadioControl(self.server.pipdataManager , self.server.pipRootObj)
+            self.radioControl = RadioControl(self.server.pipdataManager, self.server.pipRootObj)
             return_message = self.radioControl.nextStation()
         elif sCommand == "EquipWeapon":
-            self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
-            return_message = self.invControl.useInventoryItemByName(sName,'43')
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.useInventoryItemByName(sName, '43')
+        elif sCommand == "NextGun":
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.equipNextGun()
+        elif sCommand == "NextFavGun":
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.equipNextFavGun()
         elif sCommand == "NextGrenade":
-            self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
             return_message = self.invControl.equipNextGrendae()
         elif sCommand == 'GrenadeEquip':
-             self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
-             return_message = self.invControl.useInventoryItemByName(sName,'43')
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.useInventoryItemByName(sName, '43')
+        elif sCommand == "NextMine":
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.equipNextMine()
+        elif sCommand == "EquipNextExplosive":
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.equipNextExplosive()
         elif sCommand == 'EatFood':
-             self.invControl = InvetoryControl(self.server.pipdataManager , self.server.pipRootObj)
-             return_message = self.invControl.useInventoryItemByName(sName,'48')
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.useInventoryItemByName(sName, '48')
+        elif sCommand == 'EquipArmor':
+            self.invControl = InvetoryControl(self.server.pipdataManager, self.server.pipRootObj)
+            return_message = self.invControl.useInventoryItemByName(sName, '29')
+            #return_message = self.invControl.itemNameFuzzy(sName, '29')
+
         else:
             return_message = "Could not process SentCommand %s" % sCommand
         if not return_message:
@@ -74,6 +99,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
                 print('Current Health: ', currHp.value())
                 return currHp
 
+
 class MiddelWareServer(socketserver.TCPServer):
     # This class just here to store values to be passed along to handler
     def __init__(self, server_address, RequestHandlerClass, pipObj, pipDataManager):
@@ -87,6 +113,8 @@ class MiddelWareServer(socketserver.TCPServer):
         self.availableGrenades = []
         self.lastEquippedGrenade = ''
         self._logger = logging.getLogger('pypipboyapp.llhookey')
+
+
 class socket_serverThread(QtCore.QThread):
     def __init__(self, host, port, pipObj, pipDataManager):
         QtCore.QThread.__init__(self)
@@ -94,7 +122,6 @@ class socket_serverThread(QtCore.QThread):
         self.PORT = port
         self.pipObj = pipObj
         self.pipDataManager = pipDataManager
-
 
     def __del__(self):
         self.wait()
@@ -106,9 +133,6 @@ class socket_serverThread(QtCore.QThread):
 
     def _onUpdate(self, newpipRootObj):
         self.tcpServer.pipRootObj = newpipRootObj
-
-    def runMyTest(self):
-        self.tcpServer.useItemByName('43','MyPistol')
 
     def run(self):
         print(self.pipDataManager)
